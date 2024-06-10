@@ -1,61 +1,63 @@
+using System;
 using System.Collections;
 using UnityEngine;
 using UnityEngine.Pool;
 
-[RequireComponent(typeof(BoxCollider))]
-public class Spawner : MonoBehaviour
+public class Spawner<Type> : MonoBehaviour where Type : Component
 {
-    [SerializeField] private Cube _cube;
-    [SerializeField] private float _secondsToSpawn;
+    [SerializeField] private Type _object;
+    
+    public ObjectPool<Type> Pool { get; private set; }
+    public int CountAll => Pool.CountAll;
+    public int CountActive => Pool.CountActive;
 
-    private ObjectPool<Cube> _pool;
+    public event Action OnTotalCountChanged;
+    public event Action OnActiveCountChanged;
 
     private void Awake()
     {
-        _pool = new ObjectPool<Cube>(
-            createFunc: () => Instantiate(_cube),
-            actionOnGet: (cube) => ActionOnGet(cube),
-            actionOnDestroy: (cube) => Destroy(cube.gameObject),
+        Pool = new ObjectPool<Type>(
+            createFunc: () => Instantiate(_object),
+            actionOnGet: (spawningObject) => SpawnOneObject(spawningObject),
+            actionOnRelease: (spawningObject) => ActionOnRelease(),
+            actionOnDestroy: (spawningObject) => ActionOnDestroy(spawningObject),
             collectionCheck: true,
             defaultCapacity: 5,
-            maxSize: 10);
-        Collider _collider = GetComponent<Collider>();
-
-        StartCoroutine(StartSpawning());
+            maxSize: 10); ;
     }
 
-    private void ActionOnGet(Cube cube)
+    protected virtual void SpawnOneObject(Type spawningObject)
     {
-        cube.transform.position = GetRandomSpawnPosition();
-        cube.gameObject.SetActive(true);
-    }
+        spawningObject.gameObject.SetActive(true);
 
-    private IEnumerator StartSpawning()
-    {
-        WaitForSeconds secondsToSpawn = new WaitForSeconds(_secondsToSpawn);
-
-        bool isRunning = true;
-
-        while (isRunning)
+        if (spawningObject.TryGetComponent(out Rigidbody rigidbody))
         {
-            yield return secondsToSpawn;
-
-            Cube newCube = _pool.Get();
-            StartCoroutine(WaitToRelease(newCube));
+            rigidbody.velocity = Vector3.zero;
+            rigidbody.freezeRotation = true;
+            rigidbody.rotation = Quaternion.identity;
+            rigidbody.freezeRotation = false;
         }
+
+        StartCoroutine(WaitToRelease(spawningObject));
+
+        OnTotalCountChanged?.Invoke();
+        OnActiveCountChanged?.Invoke();
     }
 
-    private IEnumerator WaitToRelease(Cube cube)
+    protected virtual IEnumerator WaitToRelease(Type spawningObject)
     {
-        yield return new WaitUntil(() => cube.gameObject.activeSelf == false);
-        _pool.Release(cube);
+        yield return new WaitUntil(() => spawningObject.gameObject.activeSelf == false);
+        Pool.Release(spawningObject);
     }
 
-    private Vector3 GetRandomSpawnPosition()
+    private void ActionOnRelease()
     {
-        float randomXValue = Random.Range(GetComponent<Collider>().bounds.min.x, GetComponent<Collider>().bounds.max.x);
-        float randomZValue = Random.Range(GetComponent<Collider>().bounds.min.z, GetComponent<Collider>().bounds.max.z);
+        OnActiveCountChanged?.Invoke();
+    }
 
-        return new Vector3(randomXValue, transform.position.y, randomZValue);
+    private void ActionOnDestroy(Type spawningObject)
+    {
+        OnTotalCountChanged?.Invoke();
+        Destroy(spawningObject.gameObject);
     }
 }
