@@ -38,9 +38,8 @@ public class Cube : MonoBehaviour
     {
         float minSecondsToRelease = 2f;
         float maxSecondsToRelease = 5f;
-        WaitForSeconds waitForSeconds = new WaitForSeconds(Random.Range(minSecondsToRelease, maxSecondsToRelease));
 
-        yield return waitForSeconds;
+        yield return new WaitForSeconds(Random.Range(minSecondsToRelease, maxSecondsToRelease));
 
         _bombSpawner.SpawnAt(transform.position);
 

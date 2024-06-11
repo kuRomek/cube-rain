@@ -44,7 +44,7 @@ public class Spawner<Type> : MonoBehaviour where Type : Component
         OnActiveCountChanged?.Invoke();
     }
 
-    protected virtual IEnumerator WaitToRelease(Type spawningObject)
+    private IEnumerator WaitToRelease(Type spawningObject)
     {
         yield return new WaitUntil(() => spawningObject.gameObject.activeSelf == false);
         Pool.Release(spawningObject);
